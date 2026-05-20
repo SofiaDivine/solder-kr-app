@@ -50,11 +50,12 @@ class TaskTab(ttk.Frame):
 
         af = ttk.LabelFrame(left, text="Параметри ACO", padding=6)
         af.pack(fill="x", pady=(0, 8))
-        self.var_m      = self._entry(af, "Мурах m:",        "20",  0)
-        self.var_n_iter = self._entry(af, "Ітерації N:",    "100", 1)
-        self.var_alpha  = self._entry(af, "α (феромон):",   "1",   2)
-        self.var_beta   = self._entry(af, "β (евристика):","2",   3)
-        self.var_rho    = self._entry(af, "ρ (випаров.)",   "0.1", 4)
+        self.var_m      = self._entry(af, "Мурах m:",          "20",  0)
+        self.var_n_iter = self._entry(af, "Ітерації N_max:",   "100", 1)
+        self.var_alpha  = self._entry(af, "α (феромон):",      "1",   2)
+        self.var_beta   = self._entry(af, "β (евристика):",    "2",   3)
+        self.var_rho    = self._entry(af, "ρ (випаровування):", "0.5", 4)
+        self.var_k      = self._entry(af, "K (зупинка):",      "50",  5)
 
         tf = ttk.LabelFrame(left, text="Точки пайки (X, Y, q)", padding=6)
         tf.pack(fill="both", expand=True)
@@ -78,6 +79,8 @@ class TaskTab(ttk.Frame):
         ief.pack(fill="x", pady=2)
         ttk.Button(ief, text="Імпорт JSON",  command=self._import_json).pack(side="left", padx=2)
         ttk.Button(ief, text="Експорт JSON", command=self._export_json).pack(side="left", padx=2)
+        ttk.Button(ief, text="Імпорт CSV",   command=self._import_csv).pack(side="left", padx=2)
+        ttk.Button(ief, text="Експорт CSV",  command=self._export_csv).pack(side="left", padx=2)
 
         sf = ttk.LabelFrame(left, text="Розв'язання", padding=6)
         sf.pack(fill="x", pady=6)
@@ -118,9 +121,10 @@ class TaskTab(ttk.Frame):
                 alpha=float(self.var_alpha.get()),
                 beta=float(self.var_beta.get()),
                 rho=float(self.var_rho.get()),
+                stagnation_limit=int(self.var_k.get()),
             )
         except ValueError:
-            messagebox.showerror("Помилка", "Перевірте параметри ACO (m, N, α, β, ρ)")
+            messagebox.showerror("Помилка", "Перевірте параметри ACO (m, N, α, β, ρ, K)")
             return None
 
     def _add_row(self) -> None:
@@ -267,4 +271,54 @@ class TaskTab(ttk.Frame):
         import json
         with open(path, "w", encoding="utf-8") as f:
             json.dump(task.to_dict(), f, ensure_ascii=False, indent=2)
+        messagebox.showinfo("Готово", f"Збережено: {path}")
+
+    def _import_csv(self) -> None:
+        """Імпорт задачі з CSV-файлу.
+
+        Формат файлу:
+            Рядок 1: Q,tau,v
+            Рядки 2+: x,y,q  (по одній точці)
+        """
+        path = filedialog.askopenfilename(filetypes=[("CSV", "*.csv"), ("All", "*.*")])
+        if not path:
+            return
+        import csv
+        try:
+            with open(path, encoding="utf-8") as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+            if len(rows) < 2:
+                raise ValueError("Файл повинен містити щонайменше 2 рядки")
+            Q, tau, v = float(rows[0][0]), float(rows[0][1]), float(rows[0][2])
+            points = []
+            for row in rows[1:]:
+                if len(row) < 3:
+                    continue
+                points.append(SolderPoint(float(row[0]), float(row[1]), float(row[2])))
+            self.load_points(points, Q, tau, v)
+        except Exception as e:
+            messagebox.showerror("Помилка імпорту CSV", str(e))
+
+    def _export_csv(self) -> None:
+        """Експорт задачі у CSV-файл.
+
+        Формат файлу:
+            Рядок 1: Q,tau,v
+            Рядки 2+: x,y,q  (по одній точці)
+        """
+        task = self.get_task()
+        if task is None:
+            return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".csv", filetypes=[("CSV", "*.csv")]
+        )
+        if not path:
+            return
+        import csv
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow([task.Q, task.tau, task.v])
+            for p in task.points:
+                w.writerow([p.x, p.y, p.q])
         messagebox.showinfo("Готово", f"Збережено: {path}")

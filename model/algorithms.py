@@ -80,9 +80,9 @@ class AcoParams:
     n_iter: int = 100
     alpha: float = 1.0
     beta: float = 2.0
-    rho: float = 0.1
+    rho: float = 0.5          # коефіцієнт випаровування феромону (розділ 3.3.1)
     seed: Optional[int] = None
-    stagnation_limit: int = 0  # 0 = вимкнено; інакше зупинка після L ітерацій без покращення
+    stagnation_limit: int = 50  # K — кількість ітерацій без покращення (розділ 3.3.2)
 
 
 def solve_aco(task: ProblemInstance, params: Optional[AcoParams] = None) -> Solution:
