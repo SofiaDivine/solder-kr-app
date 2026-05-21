@@ -82,6 +82,7 @@ class AcoParams:
     beta: float = 2.0
     rho: float = 0.5          # коефіцієнт випаровування феромону (розділ 3.3.1)
     seed: Optional[int] = None
+    phi: float = 100.0  # φ — феромонна константа (розділ 2.3), не плутати з Q
     stagnation_limit: int = 50  # K — кількість ітерацій без покращення (розділ 3.3.2)
 
 
@@ -101,12 +102,17 @@ def solve_aco(task: ProblemInstance, params: Optional[AcoParams] = None) -> Solu
     n = len(task.points)
     size = n + 1
 
-    # Евристика η_ij = 1 / c_ij
+    # Евристика η_ij = 1 / (c_ij · q_j)  для точок пайки
+    # η_i0 = 1 / c_i0  для переходу до бази R (j=0)
     eta = [[0.0] * size for _ in range(size)]
     for i in range(size):
         for j in range(size):
             if i != j and task.dist[i][j] > 0:
-                eta[i][j] = 1.0 / task.dist[i][j]
+                if j == 0:
+                    eta[i][j] = 1.0 / task.dist[i][j]
+                else:
+                    q_j = task.points[j - 1].q
+                    eta[i][j] = 1.0 / (task.dist[i][j] * q_j) if q_j > 0 else 1.0 / task.dist[i][j]
 
     # Початковий феромон τ_0
     nonzero = [task.dist[i][j] for i in range(size) for j in range(size) if i != j and task.dist[i][j] > 0]
@@ -143,7 +149,7 @@ def solve_aco(task: ProblemInstance, params: Optional[AcoParams] = None) -> Solu
 
         # Підсилення на ребрах найкращої мурахи ітерації
         if iter_best_routes and iter_best_Z < float("inf"):
-            deposit = 1.0 / iter_best_Z
+            deposit = p.phi / iter_best_Z
             _deposit_pheromone(tau, iter_best_routes, deposit)
 
         if p.stagnation_limit > 0 and no_improve >= p.stagnation_limit:
